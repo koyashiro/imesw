@@ -97,8 +97,10 @@ extern "system" fn callback(ncode: i32, wparam: WPARAM, lparam: LPARAM) -> LRESU
 }
 
 unsafe fn set_ime(status: bool) {
-    let mut gti = GUITHREADINFO::default();
-    gti.cbSize = std::mem::size_of::<GUITHREADINFO>() as u32;
+    let mut gti = GUITHREADINFO {
+        cbSize: std::mem::size_of::<GUITHREADINFO>() as u32,
+        ..Default::default()
+    };
     if !GetGUIThreadInfo(0, &mut gti).as_bool() {
         return;
     }
