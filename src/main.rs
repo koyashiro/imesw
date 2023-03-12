@@ -1,18 +1,16 @@
+mod ime;
+
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use windows::Win32::{
     Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, WPARAM},
-    UI::Input::{
-        Ime::{ImmGetDefaultIMEWnd, IMC_SETOPENSTATUS},
-        KeyboardAndMouse::{
-            SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYEVENTF_EXTENDEDKEY,
-            KEYEVENTF_KEYUP, VIRTUAL_KEY,
-        },
+    UI::Input::KeyboardAndMouse::{
+        SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYEVENTF_EXTENDEDKEY,
+        KEYEVENTF_KEYUP, VIRTUAL_KEY,
     },
     UI::WindowsAndMessaging::{
-        CallNextHookEx, DispatchMessageA, GetGUIThreadInfo, GetMessageA, SendMessageA,
-        SetWindowsHookExA, UnhookWindowsHookEx, GUITHREADINFO, HC_ACTION, HHOOK, MSG,
-        WH_KEYBOARD_LL, WM_IME_CONTROL, WM_KEYUP, WM_SYSKEYDOWN,
+        CallNextHookEx, DispatchMessageA, GetMessageA, SetWindowsHookExA, UnhookWindowsHookEx,
+        HC_ACTION, HHOOK, MSG, WH_KEYBOARD_LL, WM_KEYUP, WM_SYSKEYDOWN,
     },
 };
 
@@ -51,10 +49,9 @@ extern "system" fn callback(ncode: i32, wparam: WPARAM, lparam: LPARAM) -> LRESU
                         ALT_KEY_PUSHING.lock().unwrap().left = false;
                         if !ALT_KEY_PUSHING.lock().unwrap().right {
                             if !SHORTCUT_KEY_PUSHED.load(Ordering::Relaxed) {
-                                // IME OFF
-                                unsafe {
-                                    set_ime(false);
-                                    send_virtual_key();
+                                match ime::disable() {
+                                    Ok(_) => unsafe { send_virtual_key() },
+                                    Err(e) => eprintln!("ime disable failed: {e}"),
                                 }
                             }
                             SHORTCUT_KEY_PUSHED.store(false, Ordering::Relaxed);
@@ -64,10 +61,9 @@ extern "system" fn callback(ncode: i32, wparam: WPARAM, lparam: LPARAM) -> LRESU
                         ALT_KEY_PUSHING.lock().unwrap().right = false;
                         if !ALT_KEY_PUSHING.lock().unwrap().left {
                             if !SHORTCUT_KEY_PUSHED.load(Ordering::Relaxed) {
-                                // IME ON
-                                unsafe {
-                                    set_ime(true);
-                                    send_virtual_key();
+                                match ime::enable() {
+                                    Ok(_) => unsafe { send_virtual_key() },
+                                    Err(e) => eprintln!("ime enable failed: {e}"),
                                 }
                             }
                             SHORTCUT_KEY_PUSHED.store(false, Ordering::Relaxed);
@@ -94,23 +90,6 @@ extern "system" fn callback(ncode: i32, wparam: WPARAM, lparam: LPARAM) -> LRESU
         }
     }
     unsafe { CallNextHookEx(HHOOK::default(), ncode, wparam, lparam) }
-}
-
-unsafe fn set_ime(status: bool) {
-    let mut gti = GUITHREADINFO {
-        cbSize: std::mem::size_of::<GUITHREADINFO>() as u32,
-        ..Default::default()
-    };
-    if !GetGUIThreadInfo(0, &mut gti).as_bool() {
-        return;
-    }
-    let hwnd = ImmGetDefaultIMEWnd(gti.hwndFocus);
-    SendMessageA(
-        hwnd,
-        WM_IME_CONTROL,
-        WPARAM(IMC_SETOPENSTATUS as usize),
-        LPARAM(status as isize),
-    );
 }
 
 unsafe fn send_virtual_key() {
