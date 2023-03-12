@@ -1,13 +1,10 @@
 mod ime;
+mod keyboard;
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use windows::Win32::{
     Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, WPARAM},
-    UI::Input::KeyboardAndMouse::{
-        SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYEVENTF_EXTENDEDKEY,
-        KEYEVENTF_KEYUP, VIRTUAL_KEY,
-    },
     UI::WindowsAndMessaging::{
         CallNextHookEx, DispatchMessageA, GetMessageA, SetWindowsHookExA, UnhookWindowsHookEx,
         HC_ACTION, HHOOK, MSG, WH_KEYBOARD_LL, WM_KEYUP, WM_SYSKEYDOWN,
@@ -50,7 +47,7 @@ extern "system" fn callback(ncode: i32, wparam: WPARAM, lparam: LPARAM) -> LRESU
                         if !ALT_KEY_PUSHING.lock().unwrap().right {
                             if !SHORTCUT_KEY_PUSHED.load(Ordering::Relaxed) {
                                 match ime::disable() {
-                                    Ok(_) => unsafe { send_virtual_key() },
+                                    Ok(_) => keyboard::send_vk_ff(),
                                     Err(e) => eprintln!("ime disable failed: {e}"),
                                 }
                             }
@@ -62,7 +59,7 @@ extern "system" fn callback(ncode: i32, wparam: WPARAM, lparam: LPARAM) -> LRESU
                         if !ALT_KEY_PUSHING.lock().unwrap().left {
                             if !SHORTCUT_KEY_PUSHED.load(Ordering::Relaxed) {
                                 match ime::enable() {
-                                    Ok(_) => unsafe { send_virtual_key() },
+                                    Ok(_) => keyboard::send_vk_ff(),
                                     Err(e) => eprintln!("ime enable failed: {e}"),
                                 }
                             }
@@ -90,36 +87,4 @@ extern "system" fn callback(ncode: i32, wparam: WPARAM, lparam: LPARAM) -> LRESU
         }
     }
     unsafe { CallNextHookEx(HHOOK::default(), ncode, wparam, lparam) }
-}
-
-unsafe fn send_virtual_key() {
-    SendInput(
-        &[
-            INPUT {
-                r#type: INPUT_KEYBOARD,
-                Anonymous: INPUT_0 {
-                    ki: KEYBDINPUT {
-                        wVk: VIRTUAL_KEY(0xff),
-                        wScan: 0,
-                        dwFlags: KEYEVENTF_EXTENDEDKEY,
-                        time: 0,
-                        dwExtraInfo: 0,
-                    },
-                },
-            },
-            INPUT {
-                r#type: INPUT_KEYBOARD,
-                Anonymous: INPUT_0 {
-                    ki: KEYBDINPUT {
-                        wVk: VIRTUAL_KEY(0xff),
-                        wScan: 0,
-                        dwFlags: KEYEVENTF_EXTENDEDKEY | KEYEVENTF_KEYUP,
-                        time: 0,
-                        dwExtraInfo: 0,
-                    },
-                },
-            },
-        ],
-        std::mem::size_of::<INPUT>() as i32,
-    );
 }
