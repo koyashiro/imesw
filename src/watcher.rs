@@ -60,6 +60,7 @@ impl Watcher {
         let windows_thread_id = self.windows_thread_id.load(Ordering::Relaxed);
         if windows_thread_id != 0 {
             unsafe { PostThreadMessageA(windows_thread_id, STOP_MSG, WPARAM(0), LPARAM(0)) };
+            self.windows_thread_id.store(0, Ordering::Relaxed);
         }
 
         if let Some(thread) = self.thread.take() {
