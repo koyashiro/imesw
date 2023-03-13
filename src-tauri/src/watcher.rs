@@ -34,6 +34,7 @@ impl Watcher {
     }
 
     pub fn start(&mut self) {
+        println!("start");
         let windows_thread_id = self.windows_thread_id.clone();
         let t = thread::spawn(move || {
             windows_thread_id.store(unsafe { GetCurrentThreadId() }, Ordering::Relaxed);
@@ -57,6 +58,7 @@ impl Watcher {
     }
 
     pub fn stop(&mut self) -> thread::Result<()> {
+        println!("stop");
         let windows_thread_id = self.windows_thread_id.load(Ordering::Relaxed);
         if windows_thread_id != 0 {
             unsafe { PostThreadMessageA(windows_thread_id, STOP_MSG, WPARAM(0), LPARAM(0)) };
@@ -72,6 +74,7 @@ impl Watcher {
 
 impl Drop for Watcher {
     fn drop(&mut self) {
+        println!("drop");
         self.stop().unwrap();
     }
 }
