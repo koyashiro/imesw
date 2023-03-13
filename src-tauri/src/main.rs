@@ -5,26 +5,19 @@ mod ime;
 mod keyboard;
 mod watcher;
 
-use std::{
-    rc::Rc,
-    sync::{Arc, Mutex},
-};
+use std::sync::{Arc, Mutex};
 
-use tauri::{CustomMenuItem, Manager, SystemTray, SystemTrayMenu, SystemTrayMenuItem};
+use tauri::{CustomMenuItem, Manager, SystemTray, SystemTrayEvent, SystemTrayMenu, WindowEvent};
 
 use crate::watcher::Watcher;
 
 // Learn more about Tauri commands at https://tauri.app/v1/guides/features/command
 #[tauri::command]
 fn greet(name: &str) -> String {
-    format!("Hello, {}! You've been greeted from Rust!", name)
+    format!("Hello, {name}! You've been greeted from Rust!")
 }
 
 fn main() {
-    let quit = CustomMenuItem::new("quit".to_string(), "Quit");
-    let tray_menu = SystemTrayMenu::new().add_item(quit);
-    let system_tray = SystemTray::new().with_menu(tray_menu);
-
     println!("tauri start");
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![greet])
@@ -34,22 +27,42 @@ fn main() {
             app.manage(Arc::new(Mutex::new(watcher)));
             Ok(())
         })
-        .system_tray(system_tray)
+        .system_tray({
+            let open = CustomMenuItem::new("open".to_string(), "Open");
+            let quit = CustomMenuItem::new("quit".to_string(), "Quit");
+            let tray_menu = SystemTrayMenu::new().add_item(open).add_item(quit);
+            SystemTray::new().with_menu(tray_menu)
+        })
+        .on_window_event(|h| {
+            if let WindowEvent::CloseRequested { api, .. } = &h.event() {
+                let w = h.window();
+                w.hide().unwrap();
+                api.prevent_close();
+            }
+        })
         .on_system_tray_event(move |app, event| match event {
-            tauri::SystemTrayEvent::MenuItemClick { id, .. } => match id.as_str() {
-                "quit" => {
-                    app.state::<Arc<Mutex<Watcher>>>()
-                        .lock()
-                        .unwrap()
-                        .stop()
-                        .unwrap();
-                    std::process::exit(0);
+            SystemTrayEvent::DoubleClick { .. } => {
+                let w = app.get_window("main").unwrap();
+                w.show().unwrap();
+            }
+            SystemTrayEvent::MenuItemClick { id, .. } => match id.as_str() {
+                "open" => {
+                    let w = app.get_window("main").unwrap();
+                    w.show().unwrap();
                 }
-                _ => {}
+                "quit" => {
+                    let mut watcher = app.state::<Arc<Mutex<Watcher>>>().inner().lock().unwrap();
+                    watcher.stop().unwrap();
+
+                    let w = app.get_window("main").unwrap();
+                    w.close().unwrap();
+                }
+                _ => (),
             },
-            _ => {}
+            _ => (),
         })
         .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .expect("error while building tauri application");
+
     println!("tauri end");
 }

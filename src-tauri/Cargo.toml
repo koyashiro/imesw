@@ -2,20 +2,18 @@
 name = "alt-ime"
 version = "0.1.0"
 description = "alt-ime"
-authors = ["you"]
-license = ""
-repository = ""
+authors = ["koyashiro <develop@koyashi.ro>", "lemoncmd"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/koyashiro/alt-ime-rs"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [build-dependencies]
-tauri-build = { version = "1.2", features = [] }
+tauri-build = { version = "1.2.1", features = [] }
 
 [dependencies]
-tauri = { version = "1.2", features = ["shell-open", "system-tray"] }
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
+tauri = { version = "1.2.4", features = ["shell-open", "system-tray"] }
+serde = { version = "1.0.155", features = ["derive"] }
+serde_json = "1.0.94"
 windows = { version = "0.44.0", features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging", "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_Input_Ime", "Win32_Globalization", "Win32_System_Threading"] }
 
 [features]
