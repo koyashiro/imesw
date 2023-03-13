@@ -1,12 +1,79 @@
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::{
+    sync::{
+        atomic::{AtomicBool, AtomicU32, Ordering},
+        Arc,
+    },
+    thread::{self, JoinHandle},
+};
 
 use windows::Win32::{
-    Foundation::{LPARAM, LRESULT, WPARAM},
-    UI::Input::KeyboardAndMouse::{VIRTUAL_KEY, VK_LMENU, VK_RMENU},
-    UI::WindowsAndMessaging::{CallNextHookEx, HC_ACTION, HHOOK, WM_KEYUP, WM_SYSKEYDOWN},
+    Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, WPARAM},
+    System::Threading::GetCurrentThreadId,
+    UI::{
+        Input::KeyboardAndMouse::{VIRTUAL_KEY, VK_LMENU, VK_RMENU},
+        WindowsAndMessaging::{
+            CallNextHookEx, DispatchMessageA, GetMessageA, PostThreadMessageA, SetWindowsHookExA,
+            UnhookWindowsHookEx, HC_ACTION, HHOOK, MSG, WH_KEYBOARD_LL, WM_KEYUP, WM_SYSKEYDOWN,
+        },
+    },
 };
 
 use crate::{ime, keyboard};
+
+pub const STOP_MSG: u32 = 0x8000;
+
+#[derive(Debug, Default)]
+pub struct Watcher {
+    thread: Option<JoinHandle<()>>,
+    windows_thread_id: Arc<AtomicU32>,
+}
+
+impl Watcher {
+    pub fn new() -> Self {
+        Default::default()
+    }
+
+    pub fn start(&mut self) {
+        let windows_thread_id = self.windows_thread_id.clone();
+        let t = thread::spawn(move || {
+            windows_thread_id.store(unsafe { GetCurrentThreadId() }, Ordering::Relaxed);
+
+            let hhk = unsafe {
+                SetWindowsHookExA(WH_KEYBOARD_LL, Some(callback), HINSTANCE::default(), 0)
+            }
+            .unwrap();
+            let mut msg = MSG::default();
+            while unsafe { GetMessageA(&mut msg, HWND::default(), 0, 0) }.into() {
+                if msg.message == STOP_MSG {
+                    break;
+                }
+                unsafe { DispatchMessageA(&msg) };
+            }
+
+            unsafe { UnhookWindowsHookEx(hhk) }.ok().unwrap();
+        });
+
+        self.thread = Some(t);
+    }
+
+    pub fn stop(&mut self) -> thread::Result<()> {
+        let windows_thread_id = self.windows_thread_id.load(Ordering::Relaxed);
+        if windows_thread_id != 0 {
+            unsafe { PostThreadMessageA(windows_thread_id, STOP_MSG, WPARAM(0), LPARAM(0)) };
+        }
+
+        if let Some(thread) = self.thread.take() {
+            thread.join()?;
+        }
+        Ok(())
+    }
+}
+
+impl Drop for Watcher {
+    fn drop(&mut self) {
+        self.stop().unwrap();
+    }
+}
 
 static LEFT_ALT_KEY_PUSHING: AtomicBool = AtomicBool::new(false);
 static RIGHT_ALT_KEY_PUSHING: AtomicBool = AtomicBool::new(false);

@@ -1,26 +1,27 @@
 mod ime;
 mod keyboard;
-mod windows_hook;
+mod watcher;
 
-use windows::Win32::{
-    Foundation::{HINSTANCE, HWND},
-    UI::WindowsAndMessaging::{
-        DispatchMessageA, GetMessageA, SetWindowsHookExA, UnhookWindowsHookEx, MSG, WH_KEYBOARD_LL,
-    },
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
 };
 
-use windows_hook::callback;
+use crate::watcher::Watcher;
 
-fn main() -> windows::core::Result<()> {
-    let khk =
-        unsafe { SetWindowsHookExA(WH_KEYBOARD_LL, Some(callback), HINSTANCE::default(), 0)? };
+fn main() {
+    let mut watcher = Watcher::new();
+    watcher.start();
 
-    let mut msg = MSG::default();
-    while unsafe { GetMessageA(&mut msg, HWND::default(), 0, 0) }.into() {
-        unsafe { DispatchMessageA(&msg) };
+    let running = Arc::new(AtomicBool::new(true));
+    {
+        let r = running.clone();
+        ctrlc::set_handler(move || {
+            watcher.stop().unwrap();
+            r.store(false, Ordering::SeqCst)
+        })
+        .expect("Error setting Ctrl-C handler");
     }
 
-    unsafe { UnhookWindowsHookEx(khk) };
-
-    Ok(())
+    while running.load(Ordering::SeqCst) {}
 }
