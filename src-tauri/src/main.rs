@@ -5,7 +5,7 @@ mod ime;
 mod keyboard;
 mod watcher;
 
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
 
 use tauri::{CustomMenuItem, Manager, SystemTray, SystemTrayEvent, SystemTrayMenu, WindowEvent};
 
@@ -18,23 +18,23 @@ fn greet(name: &str) -> String {
 }
 
 fn main() {
-    println!("tauri start");
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![greet])
         .setup(|app| {
             let mut watcher = Watcher::new();
             watcher.start();
-            app.manage(Arc::new(Mutex::new(watcher)));
+            app.manage(Mutex::new(watcher));
             Ok(())
         })
         .system_tray({
-            let open = CustomMenuItem::new("open".to_string(), "Open");
-            let quit = CustomMenuItem::new("quit".to_string(), "Quit");
-            let tray_menu = SystemTrayMenu::new().add_item(open).add_item(quit);
-            SystemTray::new().with_menu(tray_menu)
+            SystemTray::new().with_menu(
+                SystemTrayMenu::new()
+                    .add_item(CustomMenuItem::new("open".to_string(), "Open"))
+                    .add_item(CustomMenuItem::new("quit".to_string(), "Quit")),
+            )
         })
         .on_window_event(|h| {
-            if let WindowEvent::CloseRequested { api, .. } = &h.event() {
+            if let WindowEvent::CloseRequested { api, .. } = h.event() {
                 let w = h.window();
                 w.hide().unwrap();
                 api.prevent_close();
@@ -44,17 +44,19 @@ fn main() {
             SystemTrayEvent::DoubleClick { .. } => {
                 let w = app.get_window("main").unwrap();
                 w.show().unwrap();
+                w.set_focus().unwrap();
             }
             SystemTrayEvent::MenuItemClick { id, .. } => match id.as_str() {
                 "open" => {
-                    let w = app.get_window("main").unwrap();
+                    let w = app.get_window("main").expect("main window not found");
                     w.show().unwrap();
+                    w.set_focus().unwrap();
                 }
                 "quit" => {
-                    let mut watcher = app.state::<Arc<Mutex<Watcher>>>().inner().lock().unwrap();
+                    let mut watcher = app.state::<Mutex<Watcher>>().inner().lock().unwrap();
                     watcher.stop().unwrap();
 
-                    let w = app.get_window("main").unwrap();
+                    let w = app.get_window("main").expect("main window not found");
                     w.close().unwrap();
                 }
                 _ => (),
@@ -63,6 +65,4 @@ fn main() {
         })
         .run(tauri::generate_context!())
         .expect("error while building tauri application");
-
-    println!("tauri end");
 }
