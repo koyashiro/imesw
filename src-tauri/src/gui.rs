@@ -18,16 +18,16 @@ pub fn setup(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
     let window = WindowBuilder::new(
         app,
         MAIN_WINDOW_LABEL,
-        WindowUrl::App("index".parse().unwrap()),
+        WindowUrl::App("index".parse().expect("Failed to parse WindowUrl")),
     )
     .build()
-    .unwrap();
+    .expect("Failed to build the window");
 
     window.on_window_event({
         let w = window.clone();
         move |e| {
             if let WindowEvent::CloseRequested { api, .. } = e {
-                w.hide().unwrap();
+                w.hide().expect("Failed to hide the window");
                 api.prevent_close();
             }
         }
@@ -45,16 +45,18 @@ pub fn setup(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
             let w = window;
             move |e| match e {
                 SystemTrayEvent::DoubleClick { .. } => {
-                    w.show().unwrap();
-                    w.set_focus().unwrap();
+                    w.show().expect("Failed to show the window");
+                    w.set_focus()
+                        .expect("Failed to set the focus to the window");
                 }
                 SystemTrayEvent::MenuItemClick { id, .. } => match id.as_str() {
                     OPEN_CUSTOM_MENU_ITEM_ID => {
-                        w.show().unwrap();
-                        w.set_focus().unwrap();
+                        w.show().expect("Failed to show the window");
+                        w.set_focus()
+                            .expect("Failed to set the focus to the window");
                     }
                     QUIT_CUSTOM_MENU_ITEM_ID => {
-                        w.close().unwrap();
+                        w.close().expect("Failed to close the window");
                     }
                     _ => (),
                 },
@@ -62,7 +64,7 @@ pub fn setup(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
             }
         })
         .build(app)
-        .unwrap();
+        .expect("Failed to build SystemTray");
 
     Ok(())
 }
@@ -80,8 +82,8 @@ pub fn run_callback(app: &AppHandle, event: RunEvent) {
         app.state::<Mutex<Watcher>>()
             .inner()
             .lock()
-            .unwrap()
+            .expect("Failed to acquire lock on Watcher.")
             .stop()
-            .unwrap();
+            .expect("Failed to stop Watcher.");
     };
 }

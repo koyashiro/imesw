@@ -34,7 +34,6 @@ impl Watcher {
     }
 
     pub fn start(&mut self) {
-        println!("start");
         let windows_thread_id = self.windows_thread_id.clone();
         let t = thread::spawn(move || {
             windows_thread_id.store(unsafe { GetCurrentThreadId() }, Ordering::Relaxed);
@@ -42,7 +41,7 @@ impl Watcher {
             let hhk = unsafe {
                 SetWindowsHookExA(WH_KEYBOARD_LL, Some(callback), HINSTANCE::default(), 0)
             }
-            .unwrap();
+            .expect("Failed to set the Windows hook");
             let mut msg = MSG::default();
             while unsafe { GetMessageA(&mut msg, HWND::default(), 0, 0) }.into() {
                 if msg.message == STOP_MSG {
@@ -51,14 +50,15 @@ impl Watcher {
                 unsafe { DispatchMessageA(&msg) };
             }
 
-            unsafe { UnhookWindowsHookEx(hhk) }.ok().unwrap();
+            unsafe { UnhookWindowsHookEx(hhk) }
+                .ok()
+                .expect("Failed to unhook the Windows hook");
         });
 
         self.thread = Some(t);
     }
 
     pub fn stop(&mut self) -> thread::Result<()> {
-        println!("stop");
         let windows_thread_id = self.windows_thread_id.load(Ordering::Relaxed);
         if windows_thread_id != 0 {
             unsafe { PostThreadMessageA(windows_thread_id, STOP_MSG, WPARAM(0), LPARAM(0)) };
@@ -74,8 +74,7 @@ impl Watcher {
 
 impl Drop for Watcher {
     fn drop(&mut self) {
-        println!("drop");
-        self.stop().unwrap();
+        self.stop().expect("Failed to stop the Watcher");
     }
 }
 
