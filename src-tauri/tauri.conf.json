@@ -36,16 +36,7 @@
     "updater": {
       "active": false
     },
-    "windows": [
-      {
-        "label": "main",
-        "fullscreen": false,
-        "resizable": true,
-        "title": "alt-ime",
-        "width": 800,
-        "height": 600
-      }
-    ],
+    "windows": [],
     "systemTray": {
       "iconPath": "icons/icon.png",
       "iconAsTemplate": true
