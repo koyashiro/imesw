@@ -15,13 +15,8 @@ pub fn setup(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
     });
 
     const MAIN_WINDOW_LABEL: &str = "main";
-    let window = WindowBuilder::new(
-        app,
-        MAIN_WINDOW_LABEL,
-        WindowUrl::App("index".parse().expect("Failed to parse WindowUrl")),
-    )
-    .build()
-    .expect("Failed to build the window");
+    let window =
+        WindowBuilder::new(app, MAIN_WINDOW_LABEL, WindowUrl::App("index".parse()?)).build()?;
 
     window.on_window_event({
         let w = window.clone();
@@ -63,8 +58,7 @@ pub fn setup(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
                 _ => (),
             }
         })
-        .build(app)
-        .expect("Failed to build SystemTray");
+        .build(app)?;
 
     Ok(())
 }
