@@ -1,8 +1,8 @@
 use std::sync::Mutex;
 
 use tauri::{
-    App, AppHandle, CustomMenuItem, Manager, RunEvent, SystemTray, SystemTrayEvent, SystemTrayMenu,
-    WindowBuilder, WindowEvent, WindowUrl,
+    App, AppHandle, CustomMenuItem, Manager, PhysicalSize, RunEvent, SystemTray, SystemTrayEvent,
+    SystemTrayMenu, Window, WindowBuilder, WindowEvent, WindowUrl,
 };
 
 use crate::watcher::Watcher;
@@ -20,11 +20,18 @@ pub fn setup(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
 
     window.on_window_event({
         let w = window.clone();
-        move |e| {
-            if let WindowEvent::CloseRequested { api, .. } = e {
+        move |e| match e {
+            WindowEvent::CloseRequested { api, .. } => {
                 w.hide().expect("Failed to hide the window");
                 api.prevent_close();
             }
+            WindowEvent::Resized(PhysicalSize {
+                width: 0,
+                height: 0,
+            }) => {
+                w.hide().expect("Failed to hide the window");
+            }
+            _ => (),
         }
     });
 
@@ -38,18 +45,16 @@ pub fn setup(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
         )
         .on_event({
             let w = window;
+            fn hide_window(w: &Window) {
+                w.unminimize().expect("Failed to unminimize the window");
+                w.show().expect("Failed to show the window");
+                w.set_focus()
+                    .expect("Failed to set the focus to the window");
+            }
             move |e| match e {
-                SystemTrayEvent::DoubleClick { .. } => {
-                    w.show().expect("Failed to show the window");
-                    w.set_focus()
-                        .expect("Failed to set the focus to the window");
-                }
+                SystemTrayEvent::DoubleClick { .. } => hide_window(&w),
                 SystemTrayEvent::MenuItemClick { id, .. } => match id.as_str() {
-                    OPEN_CUSTOM_MENU_ITEM_ID => {
-                        w.show().expect("Failed to show the window");
-                        w.set_focus()
-                            .expect("Failed to set the focus to the window");
-                    }
+                    OPEN_CUSTOM_MENU_ITEM_ID => hide_window(&w),
                     QUIT_CUSTOM_MENU_ITEM_ID => {
                         w.close().expect("Failed to close the window");
                     }
