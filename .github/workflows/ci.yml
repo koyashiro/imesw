@@ -2,36 +2,15 @@ name: CI
 
 on:
   push:
-    paths:
-      - .github/workflows/ci.yml
-      - src/**
-      - Cargo.lock
-      - Cargo.toml
   pull_request:
-    paths:
-      - .github/workflows/ci.yml
-      - src/**
-      - Cargo.lock
-      - Cargo.toml
 
 jobs:
-  fmt:
-    runs-on: ubuntu-latest
+  cargo:
+    runs-on: windows-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v3
-      - name: Format check
-        uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          args: --check
-
-  clippy:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-      - name: Cache
+      - name: Cargo cache
         uses: actions/cache@v3
         with:
           path: |
@@ -39,27 +18,49 @@ jobs:
             ~/.cargo/registry/index/
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
-            target/
+            src-tauri/target/
           key: ${{ runner.os }}-cargo-clippy-${{ hashFiles('**/Cargo.lock') }}
+      - name: Build
+        working-directory: src-tauri/
+        run: cargo build --locked --release
+      - name: Format check
+        working-directory: src-tauri/
+        run: cargo fmt --check
       - name: Clippy
-        uses: actions-rs/cargo@v1
+        working-directory: src-tauri/
+        run: cargo clippy -- --deny warnings
+      - name: Test
+        working-directory: src-tauri/
+        run: cargo test --all-targets --all-features
+      - name: Audit
+        working-directory: src-tauri/
+        run: cargo audit
+
+  npm:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Setup node
+        uses: actions/setup-node@v3
         with:
-          command: clippy
-          args: -- --deny warnings
+          cache: npm
+      - name: Build
+        run: npx run build
+      - name: ESLint
+        run: npx eslint
+      - name: Prettier
+        run: npx prettier --check .
 
   build:
-    name: build (${{ matrix.target }})
     runs-on: windows-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        target:
-          - x86_64-pc-windows-gnu
-          - x86_64-pc-windows-msvc
+    needs:
+      - cargo
+      - npm
     steps:
       - name: Checkout
         uses: actions/checkout@v3
-      - name: Cache
+      - name: Cargo cache
         uses: actions/cache@v3
         with:
           path: |
@@ -67,48 +68,11 @@ jobs:
             ~/.cargo/registry/index/
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-${{ matrix.target }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
-      - name: Install Rust toolchain
-        uses: actions-rs/toolchain@v1
+            src-tauri/target/
+          key: ${{ runner.os }}-cargo-clippy-${{ hashFiles('**/Cargo.lock') }}
+      - name: Setup node
+        uses: actions/setup-node@v3
         with:
-          toolchain: stable
-          target: ${{ matrix.target }}
-          override: true
-          profile: minimal
-      - name: Build
-        uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: --locked --release --target=${{ matrix.target }}
-
-  test:
-    runs-on: windows-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-      - name: Cache
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-cargo-test-${{ hashFiles('**/Cargo.lock') }}
-      - name: Test
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --all-targets --all-features
-
-  audit:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-      - name: Audit
-        uses: actions-rs/cargo@v1
-        with:
-          command: audit
+          cache: npm
+      - name: Tauri build
+        run: npx tauri build
