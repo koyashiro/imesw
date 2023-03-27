@@ -45,19 +45,19 @@ pub fn setup(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
         )
         .on_event({
             let w = window;
-            fn hide_window(w: &Window) {
+            fn open_window(w: &Window) {
                 w.unminimize().expect("Failed to unminimize the window");
                 w.show().expect("Failed to show the window");
                 w.set_focus()
                     .expect("Failed to set the focus to the window");
             }
             move |e| match e {
-                SystemTrayEvent::DoubleClick { .. } => hide_window(&w),
+                SystemTrayEvent::LeftClick { .. } | SystemTrayEvent::DoubleClick { .. } => {
+                    open_window(&w)
+                }
                 SystemTrayEvent::MenuItemClick { id, .. } => match id.as_str() {
-                    OPEN_CUSTOM_MENU_ITEM_ID => hide_window(&w),
-                    QUIT_CUSTOM_MENU_ITEM_ID => {
-                        w.close().expect("Failed to close the window");
-                    }
+                    OPEN_CUSTOM_MENU_ITEM_ID => open_window(&w),
+                    QUIT_CUSTOM_MENU_ITEM_ID => w.close().expect("Failed to close the window"),
                     _ => (),
                 },
                 _ => (),
