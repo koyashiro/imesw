@@ -5,9 +5,10 @@ use tauri::{
     SystemTrayMenu, Window, WindowBuilder, WindowEvent, WindowUrl,
 };
 
-use crate::watcher::Watcher;
+use crate::{config::Config, watcher::Watcher};
 
 pub fn setup(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
+    app.manage(Mutex::new(Config::default()));
     app.manage({
         let mut watcher = Watcher::new();
         watcher.start();
@@ -71,10 +72,20 @@ pub fn setup(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
 }
 
 pub mod handler {
-    // Learn more about Tauri commands at https://tauri.app/v1/guides/features/command
+    use std::sync::Mutex;
+
+    use tauri::State;
+
+    use crate::config::Config;
+
     #[tauri::command]
-    pub fn greet(name: &str) -> String {
-        format!("Hello, {name}! You've been greeted from Rust!")
+    pub fn get_enabled(config: State<'_, Mutex<Config>>) -> bool {
+        config.lock().unwrap().enabled
+    }
+
+    #[tauri::command]
+    pub fn set_enabled(config: State<'_, Mutex<Config>>, v: bool) {
+        config.lock().unwrap().enabled = v
     }
 }
 

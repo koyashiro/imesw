@@ -1,8 +1,15 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { invoke } from "@tauri-apps/api";
 import { ToggleSwitch } from "flowbite-react";
 
 function App() {
   const [enabled, setEnabled] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      setEnabled(await invoke<boolean>("get_enabled"));
+    })();
+  }, []);
 
   return (
     <div className="h-screen bg-red-50">
@@ -25,7 +32,10 @@ function App() {
               <ToggleSwitch
                 checked={enabled}
                 label={""}
-                onChange={setEnabled}
+                onChange={async (v) => {
+                  await invoke("set_enabled", { v });
+                  setEnabled(v);
+                }}
               />
             </div>
           </div>
