@@ -15,8 +15,10 @@ pub fn setup(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
     });
 
     const MAIN_WINDOW_LABEL: &str = "main";
-    let window =
-        WindowBuilder::new(app, MAIN_WINDOW_LABEL, WindowUrl::App("index".parse()?)).build()?;
+    let window = WindowBuilder::new(app, MAIN_WINDOW_LABEL, WindowUrl::App("index".parse()?))
+        .title(env!("CARGO_PKG_NAME"))
+        .resizable(false)
+        .build()?;
 
     window.on_window_event({
         let w = window.clone();
