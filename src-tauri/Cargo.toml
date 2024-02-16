@@ -1,22 +1,40 @@
 [package]
-name = "alt-ime"
-version = "0.1.0"
-description = "alt-ime"
-authors = ["koyashiro <develop@koyashi.ro>", "lemoncmd"]
-license = "MIT OR Apache-2.0"
-repository = "https://github.com/koyashiro/alt-ime-rs"
+name = "imesw"
+version = "0.0.0"
+description = "A Tauri App"
+authors = ["you"]
 edition = "2021"
 
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
 [build-dependencies]
-tauri-build = { version = "1.2.1", features = [] }
+tauri-build = { version = "1.5.1", features = [] }
 
 [dependencies]
-tauri = { version = "1.2.4", features = ["shell-open", "system-tray"] }
-serde = { version = "1.0.155", features = ["derive"] }
-serde_json = "1.0.94"
-windows = { version = "0.44.0", features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging", "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_Input_Ime", "Win32_Globalization", "Win32_System_Threading"] }
+anyhow = "1.0.79"
+once_cell = "1.19.0"
+serde = { version = "1.0.196", features = ["derive"] }
+serde_json = "1.0.113"
+tauri = { version = "1.5.4", features = ["shell-open"] }
+windows = { version = "0.52.0", features = [
+  "Win32",
+  "Win32_Foundation",
+  "Win32_Globalization",
+  "Win32_UI",
+  "Win32_UI_Input",
+  "Win32_UI_Input_Ime",
+  "Win32_UI_Input_KeyboardAndMouse",
+  "Win32_UI_WindowsAndMessaging",
+] }
 
 [features]
 # this feature is used for production builds or when `devPath` points to the filesystem
 # DO NOT REMOVE!!
 custom-protocol = ["tauri/custom-protocol"]
+
+[profile.release]
+opt-level = 3
+strip = true
+lto = true
+panic = "abort"
+codegen-units = 1

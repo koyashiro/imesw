@@ -5,13 +5,34 @@ on:
   pull_request:
 
 jobs:
-  cargo:
-    runs-on: windows-latest
+  cargo-build:
+    runs-on: windows-2022
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4.1.1
       - name: Cargo cache
-        uses: actions/cache@v3
+        uses: actions/cache@v4.0.0
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            src-tauri/target/
+          key: ${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-build-
+      - name: Build
+        run: cargo build
+        working-directory: src-tauri/
+
+  cargo-clippy:
+    runs-on: windows-2022
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4.1.1
+      - name: Cargo cache
+        uses: actions/cache@v4.0.0
         with:
           path: |
             ~/.cargo/bin/
@@ -20,48 +41,108 @@ jobs:
             ~/.cargo/git/db/
             src-tauri/target/
           key: ${{ runner.os }}-cargo-clippy-${{ hashFiles('**/Cargo.lock') }}
-      - name: Build
-        working-directory: src-tauri/
-        run: cargo build --locked --release
-      - name: Format check
-        working-directory: src-tauri/
-        run: cargo fmt --check
+          restore-keys: |
+            ${{ runner.os }}-cargo-clippy-
       - name: Clippy
-        working-directory: src-tauri/
         run: cargo clippy -- --deny warnings
-      - name: Test
         working-directory: src-tauri/
-        run: cargo test --all-targets --all-features
-      - name: Audit
-        working-directory: src-tauri/
-        run: cargo audit
 
-  npm:
-    runs-on: ubuntu-latest
+  cargo-fmt:
+    runs-on: ubuntu-22.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
-      - name: Setup node
-        uses: actions/setup-node@v3
+        uses: actions/checkout@v4.1.1
+      - name: Format check
+        run: cargo fmt --check
+        working-directory: src-tauri/
+
+  cargo-test:
+    runs-on: windows-2022
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4.1.1
+      - name: Cargo cache
+        uses: actions/cache@v4.0.0
         with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            src-tauri/target/
+          key: ${{ runner.os }}-cargo-test-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-test-
+      - name: Make dist dir
+        run: mkdir dist/
+      - name: Test
+        run: cargo test --all-targets --all-features
+        working-directory: src-tauri/
+
+  cargo-audit:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4.1.1
+      - name: Audit
+        run: cargo audit
+        working-directory: src-tauri/
+
+  node-build:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4.1.1
+      - name: Setup Node.js
+        uses: actions/setup-node@v4.0.2
+        with:
+          node-version-file: package.json
           cache: npm
+      - name: Install npm dependencies
+        run: npm ci
       - name: Build
-        run: npx run build
+        run: npm run build
+
+  node-eslint:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4.1.1
+      - name: Setup Node.js
+        uses: actions/setup-node@v4.0.2
+        with:
+          node-version-file: package.json
+          cache: npm
+      - name: Install npm dependencies
+        run: npm ci
       - name: ESLint
-        run: npx eslint
+        run: npx eslint .
+
+  node-prettier:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4.1.1
+      - name: Setup Node.js
+        uses: actions/setup-node@v4.0.2
+        with:
+          node-version-file: package.json
+          cache: npm
+      - name: Install npm dependencies
+        run: npm ci
       - name: Prettier
         run: npx prettier --check .
 
-  build:
-    runs-on: windows-latest
+  tauri-build:
+    runs-on: windows-2022
     needs:
-      - cargo
-      - npm
+      - cargo-build
+      - node-build
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4.1.1
       - name: Cargo cache
-        uses: actions/cache@v3
+        uses: actions/cache@v4.0.0
         with:
           path: |
             ~/.cargo/bin/
@@ -69,10 +150,15 @@ jobs:
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             src-tauri/target/
-          key: ${{ runner.os }}-cargo-clippy-${{ hashFiles('**/Cargo.lock') }}
-      - name: Setup node
-        uses: actions/setup-node@v3
+          key: ${{ runner.os }}-tauri-build-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-build-
+      - name: Setup Node.js
+        uses: actions/setup-node@v4.0.2
         with:
+          node-version-file: package.json
           cache: npm
+      - name: Install npm dependencies
+        run: npm ci
       - name: Tauri build
-        run: npx tauri build
+        run: npm run tauri build
