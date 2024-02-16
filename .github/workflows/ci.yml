@@ -152,7 +152,7 @@ jobs:
             src-tauri/target/
           key: ${{ runner.os }}-tauri-build-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            ${{ runner.os }}-cargo-build-
+            ${{ runner.os }}-tauri-build-
       - name: Setup Node.js
         uses: actions/setup-node@v4.0.2
         with:
