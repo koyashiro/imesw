@@ -13,8 +13,8 @@
     "@emotion/react": "11.11.3",
     "@emotion/styled": "11.11.0",
     "@fontsource/inter": "5.0.16",
-    "@mui/icons-material": "5.15.7",
-    "@mui/joy": "5.0.0-beta.25",
+    "@mui/icons-material": "5.15.10",
+    "@mui/joy": "5.0.0-beta.28",
     "@tauri-apps/api": "1.5.3",
     "react": "18.2.0",
     "react-dom": "18.2.0"
