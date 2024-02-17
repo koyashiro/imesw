@@ -19,9 +19,9 @@ jobs:
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             src-tauri/target/
-          key: ${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            ${{ runner.os }}-cargo-build-
+            ${{ runner.os }}-cargo-
       - name: Build
         run: cargo build
         working-directory: src-tauri/
@@ -40,9 +40,9 @@ jobs:
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             src-tauri/target/
-          key: ${{ runner.os }}-cargo-clippy-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            ${{ runner.os }}-cargo-clippy-
+            ${{ runner.os }}-cargo-
       - name: Clippy
         run: cargo clippy -- --deny warnings
         working-directory: src-tauri/
@@ -70,9 +70,9 @@ jobs:
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             src-tauri/target/
-          key: ${{ runner.os }}-cargo-test-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            ${{ runner.os }}-cargo-test-
+            ${{ runner.os }}-cargo-
       - name: Make dist dir
         run: mkdir dist/
       - name: Test
@@ -150,9 +150,9 @@ jobs:
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             src-tauri/target/
-          key: ${{ runner.os }}-tauri-build-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-tauri-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            ${{ runner.os }}-tauri-build-
+            ${{ runner.os }}-tauri-
       - name: Setup Node.js
         uses: actions/setup-node@v4.0.2
         with:
