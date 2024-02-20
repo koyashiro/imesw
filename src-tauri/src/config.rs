@@ -1,8 +1,21 @@
-use std::fmt::Debug;
+use std::{
+    fmt::Debug,
+    fs::{self, File},
+    io::{BufReader, BufWriter},
+    path::PathBuf,
+};
 
+use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 
 use crate::keyboard::Key;
+
+static CONFIG_DIR: Lazy<PathBuf> = Lazy::new(|| {
+    dirs_next::config_dir()
+        .expect("Failed to get config dir")
+        .join(env!("CARGO_PKG_NAME"))
+});
+static SETTINGS_FILE: Lazy<PathBuf> = Lazy::new(|| CONFIG_DIR.join("settings.json"));
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Config {
@@ -26,68 +39,111 @@ impl Default for Config {
     }
 }
 
-pub trait ConfigManager: Debug + Send + Sync + 'static {
-    fn get_config(&self) -> Config;
+pub trait ConfigManager: Debug + Send + Sync + AsRef<Config> + 'static {
+    fn get_config(&self) -> &Config {
+        self.as_ref()
+    }
 
-    fn set_is_running(&mut self, is_running: bool);
+    fn set_config(&mut self, config: Config) -> anyhow::Result<()>;
 
-    fn set_activate_key(&mut self, key: Key);
+    fn set_is_running(&mut self, is_running: bool) -> anyhow::Result<()>;
 
-    fn set_deactivate_key(&mut self, key: Key);
+    fn set_activate_key(&mut self, key: Key) -> anyhow::Result<()>;
+
+    fn set_deactivate_key(&mut self, key: Key) -> anyhow::Result<()>;
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Default, PartialEq, Eq)]
 pub struct ConfigManagerImpl {
-    is_running: bool,
-    activate_key: Key,
-    deactivate_key: Key,
+    config: Config,
 }
 
 impl ConfigManagerImpl {
-    pub fn new(config: Config) -> Self {
-        Self {
-            is_running: config.is_running,
-            activate_key: config.activate_key,
-            deactivate_key: config.deactivate_key,
-        }
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    #[allow(dead_code)]
+    pub fn load(&mut self) -> anyhow::Result<()> {
+        let config = read_config()?;
+        self.set_config(config)?;
+        Ok(())
+    }
+
+    pub fn load_or_init(&mut self) -> anyhow::Result<()> {
+        match read_config() {
+            Ok(config) => self.set_config(config),
+            Err(_) => self.save(),
+        }?;
+        Ok(())
+    }
+
+    pub fn save(&mut self) -> anyhow::Result<()> {
+        let config = self.get_config();
+        write_config(config)?;
+        Ok(())
     }
 }
 
-impl Default for ConfigManagerImpl {
-    fn default() -> Self {
-        let config = Config::default();
-        Self::new(config)
+impl AsRef<Config> for ConfigManagerImpl {
+    fn as_ref(&self) -> &Config {
+        &self.config
+    }
+}
+
+impl From<Config> for ConfigManagerImpl {
+    fn from(config: Config) -> Self {
+        Self { config }
     }
 }
 
 impl ConfigManager for ConfigManagerImpl {
-    fn get_config(&self) -> Config {
-        Config {
-            is_running: self.is_running,
-            activate_key: self.activate_key.clone(),
-            deactivate_key: self.deactivate_key.clone(),
-        }
+    fn set_config(&mut self, config: Config) -> anyhow::Result<()> {
+        self.config = config;
+        self.save()?;
+        Ok(())
     }
 
-    fn set_is_running(&mut self, is_running: bool) {
-        self.is_running = is_running;
+    fn set_is_running(&mut self, is_running: bool) -> anyhow::Result<()> {
+        self.config.is_running = is_running;
+        self.save()?;
+        Ok(())
     }
 
-    fn set_activate_key(&mut self, key: Key) {
-        if key == self.deactivate_key {
-            self.deactivate_key = self.activate_key.clone();
-        }
-
-        self.activate_key = key;
-    }
-
-    fn set_deactivate_key(&mut self, key: Key) {
-        if key == self.activate_key {
-            self.activate_key = self.deactivate_key.clone();
+    fn set_activate_key(&mut self, key: Key) -> anyhow::Result<()> {
+        if key == self.config.deactivate_key {
+            self.config.deactivate_key = self.config.activate_key.clone();
         }
 
-        self.deactivate_key = key;
+        self.config.activate_key = key;
+        self.save()?;
+        Ok(())
     }
+
+    fn set_deactivate_key(&mut self, key: Key) -> anyhow::Result<()> {
+        if key == self.config.activate_key {
+            self.config.activate_key = self.config.deactivate_key.clone();
+        }
+
+        self.config.deactivate_key = key;
+        self.save()?;
+        Ok(())
+    }
+}
+
+fn read_config() -> anyhow::Result<Config> {
+    let file = File::open(SETTINGS_FILE.as_path())?;
+    let reader = BufReader::new(file);
+    let config: Config = serde_json::from_reader(reader)?;
+    Ok(config)
+}
+
+fn write_config(config: &Config) -> anyhow::Result<()> {
+    fs::create_dir_all(CONFIG_DIR.as_path())?;
+    let file = File::create(SETTINGS_FILE.as_path())?;
+    let writer = BufWriter::new(file);
+    serde_json::to_writer_pretty(writer, config)?;
+    Ok(())
 }
 
 #[cfg(test)]
@@ -110,51 +166,28 @@ mod tests {
 
     #[test]
     fn test_config_manager_new() {
-        let config = Config {
-            is_running: true,
-            activate_key: Key::RightShift,
-            deactivate_key: Key::LeftCtrl,
-        };
-
-        assert_eq!(
-            ConfigManagerImpl::new(config.clone()),
-            ConfigManagerImpl {
-                is_running: config.is_running,
-                activate_key: config.activate_key,
-                deactivate_key: config.deactivate_key
-            }
-        );
-    }
-
-    #[test]
-    fn test_config_manager_default() {
-        let config = Config::default();
-
-        assert_eq!(
-            ConfigManagerImpl::default(),
-            ConfigManagerImpl {
-                is_running: config.is_running,
-                activate_key: config.activate_key,
-                deactivate_key: config.deactivate_key
-            }
-        );
+        assert_eq!(ConfigManagerImpl::new(), ConfigManagerImpl::default(),);
     }
 
     #[test]
     fn test_config_manager_get_config() {
-        let config_manager = ConfigManagerImpl::default();
+        let config = Config::default();
 
-        assert_eq!(config_manager.get_config(), Config::default());
+        let config_manager = ConfigManagerImpl {
+            config: config.clone(),
+        };
+
+        assert_eq!(config_manager.get_config(), &config);
     }
 
     #[test]
     fn test_config_manager_set_is_running() {
         let mut config_manager = ConfigManagerImpl::default();
 
-        config_manager.set_is_running(true);
+        config_manager.set_is_running(true).unwrap();
         assert!(config_manager.get_config().is_running);
 
-        config_manager.set_is_running(false);
+        config_manager.set_is_running(false).unwrap();
         assert!(!config_manager.get_config().is_running);
     }
 
@@ -162,10 +195,10 @@ mod tests {
     fn test_config_manager_set_activate_key() {
         let mut config_manager = ConfigManagerImpl::default();
 
-        config_manager.set_activate_key(Key::RightShift);
+        config_manager.set_activate_key(Key::RightShift).unwrap();
         assert_eq!(config_manager.get_config().activate_key, Key::RightShift);
 
-        config_manager.set_activate_key(Key::LeftCtrl);
+        config_manager.set_activate_key(Key::LeftCtrl).unwrap();
         assert_eq!(config_manager.get_config().activate_key, Key::LeftCtrl);
     }
 
@@ -173,10 +206,10 @@ mod tests {
     fn test_config_manager_set_deactivate_key() {
         let mut config_manager = ConfigManagerImpl::default();
 
-        config_manager.set_deactivate_key(Key::RightCtrl);
+        config_manager.set_deactivate_key(Key::RightCtrl).unwrap();
         assert_eq!(config_manager.get_config().deactivate_key, Key::RightCtrl);
 
-        config_manager.set_deactivate_key(Key::LeftShift);
+        config_manager.set_deactivate_key(Key::LeftShift).unwrap();
         assert_eq!(config_manager.get_config().deactivate_key, Key::LeftShift);
     }
 }
