@@ -27,11 +27,11 @@ fn main() {
     tauri::Builder::default()
         .setup({
             move |app| {
-                let config_manager: Arc<RwLock<dyn ConfigManager>> = Arc::new(RwLock::new({
-                    let mut config_manager = ConfigManagerImpl::new();
-                    config_manager.load_or_init()?;
-                    config_manager
-                }));
+                let mut config_manager = ConfigManagerImpl::new();
+                config_manager.load_or_init()?;
+                let config = config_manager.get_config().to_owned();
+                let config_manager: Arc<RwLock<dyn ConfigManager>> =
+                    Arc::new(RwLock::new(config_manager));
 
                 hook::init(
                     config_manager.clone(),
@@ -39,7 +39,7 @@ fn main() {
                     Box::new(KeyboardImpl),
                 )?;
 
-                app.manage(config_manager);
+                app.manage(config_manager.clone());
 
                 let main_window_label = &app.config().tauri.windows[0].label;
                 let main_window = app.get_window(main_window_label).unwrap();
@@ -61,11 +61,16 @@ fn main() {
                 });
 
                 const OPEN_CUSTOM_MENU_ITEM_ID: &str = "open";
+                const IS_RUNNING_CUSTOM_MENU_ITEM_ID: &str = "is_running";
                 const QUIT_CUSTOM_MENU_ITEM_ID: &str = "quit";
-                SystemTray::new()
+                let system_tray = SystemTray::new()
                     .with_menu(
                         SystemTrayMenu::new()
                             .add_item(CustomMenuItem::new(OPEN_CUSTOM_MENU_ITEM_ID, "Open"))
+                            .add_item(CustomMenuItem::new(
+                                IS_RUNNING_CUSTOM_MENU_ITEM_ID,
+                                "Active",
+                            ))
                             .add_item(CustomMenuItem::new(QUIT_CUSTOM_MENU_ITEM_ID, "Quit")),
                     )
                     .on_event({
@@ -75,10 +80,23 @@ fn main() {
                             w.set_focus()
                                 .expect("Failed to set the focus to the window");
                         };
+                        let app_handle = app.handle();
                         move |e| match e {
                             LeftClick { .. } | DoubleClick { .. } => open_window(&main_window),
                             MenuItemClick { id, .. } => match id.as_str() {
                                 OPEN_CUSTOM_MENU_ITEM_ID => open_window(&main_window),
+                                IS_RUNNING_CUSTOM_MENU_ITEM_ID => {
+                                    let tray_handle = app_handle.tray_handle();
+                                    let mut config_manager = config_manager.write().unwrap();
+                                    let is_running = config_manager.get_config().is_running;
+                                    tray_handle
+                                        .get_item(IS_RUNNING_CUSTOM_MENU_ITEM_ID)
+                                        .set_selected(!is_running)
+                                        .expect("Failed to set the item selected");
+                                    config_manager
+                                        .set_is_running(!is_running)
+                                        .expect("Failed to set is_running");
+                                }
                                 QUIT_CUSTOM_MENU_ITEM_ID => {
                                     main_window.close().expect("Failed to close the window")
                                 }
@@ -88,6 +106,10 @@ fn main() {
                         }
                     })
                     .build(app)?;
+
+                system_tray
+                    .get_item(IS_RUNNING_CUSTOM_MENU_ITEM_ID)
+                    .set_selected(config.is_running)?;
 
                 Ok(())
             }
