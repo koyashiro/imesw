@@ -27,8 +27,11 @@ fn main() {
     tauri::Builder::default()
         .setup({
             move |app| {
-                let config_manager: Arc<RwLock<dyn ConfigManager>> =
-                    Arc::new(RwLock::new(ConfigManagerImpl::default()));
+                let config_manager: Arc<RwLock<dyn ConfigManager>> = Arc::new(RwLock::new({
+                    let mut config_manager = ConfigManagerImpl::new();
+                    config_manager.load_or_init()?;
+                    config_manager
+                }));
 
                 hook::init(
                     config_manager.clone(),

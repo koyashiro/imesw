@@ -15,9 +15,7 @@ pub fn get_config(
     config_manager: State<'_, Arc<RwLock<dyn ConfigManager>>>,
 ) -> Result<Config, InvokeError> {
     let config_manager = config_manager.read().map_err(into_read_invoke_error)?;
-
-    let config = config_manager.get_config();
-
+    let config = config_manager.get_config().to_owned();
     Ok(config)
 }
 
@@ -27,9 +25,9 @@ pub fn set_is_running(
     is_running: bool,
 ) -> Result<(), InvokeError> {
     let mut config_manager = config_manager.write().map_err(into_write_invoke_error)?;
-
-    config_manager.set_is_running(is_running);
-
+    config_manager
+        .set_is_running(is_running)
+        .map_err(InvokeError::from_anyhow)?;
     Ok(())
 }
 
@@ -39,9 +37,9 @@ pub fn set_activate_key(
     key: Key,
 ) -> Result<(), InvokeError> {
     let mut config_manager = config_manager.write().map_err(into_write_invoke_error)?;
-
-    config_manager.set_activate_key(key);
-
+    config_manager
+        .set_activate_key(key)
+        .map_err(InvokeError::from_anyhow)?;
     Ok(())
 }
 
@@ -51,9 +49,9 @@ pub fn set_deactivate_key(
     key: Key,
 ) -> Result<(), InvokeError> {
     let mut config_manager = config_manager.write().map_err(into_write_invoke_error)?;
-
-    config_manager.set_deactivate_key(key);
-
+    config_manager
+        .set_deactivate_key(key)
+        .map_err(InvokeError::from_anyhow)?;
     Ok(())
 }
 
