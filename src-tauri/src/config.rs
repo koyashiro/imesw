@@ -8,9 +8,8 @@ use std::{
 
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
-use tauri::AppHandle;
 
-use crate::keyboard::Key;
+use crate::{keyboard::Key, tray::SystemTrayUpdater};
 
 static CONFIG_DIR: Lazy<PathBuf> = Lazy::new(|| {
     dirs_next::config_dir()
@@ -44,8 +43,6 @@ impl Default for Config {
 pub trait ConfigManager: Debug + Send + Sync + 'static {
     fn load(&self) -> anyhow::Result<()>;
 
-    fn load_or_init(&self) -> anyhow::Result<()>;
-
     fn save(&self) -> anyhow::Result<()>;
 
     fn config(&self) -> anyhow::Result<Config>;
@@ -62,40 +59,32 @@ pub trait ConfigManager: Debug + Send + Sync + 'static {
 }
 
 #[derive(Debug)]
-pub struct ConfigManagerImpl {
+pub struct ConfigManagerImpl<T: SystemTrayUpdater> {
     config: RwLock<Config>,
-    app_handle: AppHandle,
+    system_tray_updater: T,
 }
 
-impl ConfigManagerImpl {
-    pub fn new(app_handle: AppHandle) -> Self {
+impl<T: SystemTrayUpdater> ConfigManagerImpl<T> {
+    pub fn new(config: Config, system_tray_updater: T) -> Self {
+        system_tray_updater.update(&config).unwrap();
         Self {
-            config: RwLock::new(Config::default()),
-            app_handle,
+            config: RwLock::new(config),
+            system_tray_updater,
         }
     }
 
-    fn update_task_tray(&self) -> anyhow::Result<()> {
+    pub fn update_system_tray(&self) -> anyhow::Result<()> {
         let config = self.config()?;
-        if let Some(item) = self.app_handle.tray_handle().try_get_item("is_running") {
-            item.set_selected(config.is_running)?;
-        }
+        self.system_tray_updater.update(&config)?;
         Ok(())
     }
 }
 
-impl ConfigManager for ConfigManagerImpl {
+impl<T: SystemTrayUpdater> ConfigManager for ConfigManagerImpl<T> {
     fn load(&self) -> anyhow::Result<()> {
         let config = read_config()?;
         self.set_config(config)?;
-        Ok(())
-    }
-
-    fn load_or_init(&self) -> anyhow::Result<()> {
-        match read_config() {
-            Ok(config) => self.set_config(config),
-            Err(_) => self.save(),
-        }?;
+        self.update_system_tray()?;
         Ok(())
     }
 
@@ -121,7 +110,7 @@ impl ConfigManager for ConfigManagerImpl {
                 .write()
                 .map_err(|e| anyhow::anyhow!(e.to_string()))? = config;
         }
-        self.update_task_tray()?;
+        self.update_system_tray()?;
         self.save()?;
         Ok(())
     }
@@ -134,7 +123,7 @@ impl ConfigManager for ConfigManagerImpl {
                 .map_err(|e| anyhow::anyhow!(e.to_string()))?;
             config.is_running = is_running;
         }
-        self.update_task_tray()?;
+        self.update_system_tray()?;
         self.save()?;
         Ok(())
     }
@@ -147,7 +136,7 @@ impl ConfigManager for ConfigManagerImpl {
                 .map_err(|e| anyhow::anyhow!(e.to_string()))?;
             config.is_running = !config.is_running;
         }
-        self.update_task_tray()?;
+        self.update_system_tray()?;
         self.save()?;
         Ok(())
     }
@@ -163,7 +152,7 @@ impl ConfigManager for ConfigManagerImpl {
             }
             config.activate_key = key;
         }
-        self.update_task_tray()?;
+        self.update_system_tray()?;
         self.save()?;
         Ok(())
     }
@@ -179,20 +168,29 @@ impl ConfigManager for ConfigManagerImpl {
             }
             config.deactivate_key = key;
         }
-        self.update_task_tray()?;
+        self.update_system_tray()?;
         self.save()?;
         Ok(())
     }
 }
 
-fn read_config() -> anyhow::Result<Config> {
+pub fn read_config() -> anyhow::Result<Config> {
     let file = File::open(SETTINGS_FILE.as_path())?;
     let reader = BufReader::new(file);
     let config: Config = serde_json::from_reader(reader)?;
     Ok(config)
 }
 
-fn write_config(config: &Config) -> anyhow::Result<()> {
+pub fn read_or_default() -> Config {
+    let file = match File::open(SETTINGS_FILE.as_path()) {
+        Ok(file) => file,
+        Err(_) => return Config::default(),
+    };
+    let reader = BufReader::new(file);
+    serde_json::from_reader(reader).unwrap_or_default()
+}
+
+pub fn write_config(config: &Config) -> anyhow::Result<()> {
     fs::create_dir_all(CONFIG_DIR.as_path())?;
     let file = File::create(SETTINGS_FILE.as_path())?;
     let writer = BufWriter::new(file);
