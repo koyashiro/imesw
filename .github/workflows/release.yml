@@ -35,8 +35,11 @@ jobs:
           sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev libappindicator3-dev librsvg2-dev patchelf
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
-      - uses: tauri-apps/tauri-action@8e393664005b532fa959fbd1a59c1d2235ff9248 # v0.5.0
+      - name: Build and upload artifacts
+        uses: tauri-apps/tauri-action@8e393664005b532fa959fbd1a59c1d2235ff9248 # v0.5.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
+          releaseName: v__VERSION__
+          releaseBody: See the assets to download this version and install.
           tagName: v__VERSION__
