@@ -155,4 +155,4 @@ jobs:
       - name: Install npm dependencies
         run: npm ci
       - name: Tauri build
-        run: npm run tauri build
+        run: npm run tauri build -- --debug
