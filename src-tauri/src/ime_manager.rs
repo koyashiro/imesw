@@ -9,15 +9,15 @@ use windows::Win32::{
     },
 };
 
-pub trait ImeActivator: Debug + Send + Sync + 'static {
+pub trait ImeManager: Debug + Send + Sync + 'static {
     fn activate(&self) -> anyhow::Result<()>;
     fn deactivate(&self) -> anyhow::Result<()>;
 }
 
 #[derive(Debug)]
-pub struct ImeActivatorImpl;
+pub struct ImeManagerImpl;
 
-impl ImeActivator for ImeActivatorImpl {
+impl ImeManager for ImeManagerImpl {
     fn activate(&self) -> anyhow::Result<()> {
         set_ime_status(true)
     }

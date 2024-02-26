@@ -1,19 +1,24 @@
-use std::{fmt::Debug, sync::Arc};
+use std::{
+    fmt::Debug,
+    sync::{Arc, RwLock},
+};
 
 use tauri::{
     AppHandle, CustomMenuItem, Manager, SystemTray,
     SystemTrayEvent::{self, DoubleClick, LeftClick, MenuItemClick},
-    SystemTrayMenu, SystemTrayMenuItemHandle,
+    SystemTrayMenu,
+    SystemTrayMenuItem::Separator,
+    SystemTrayMenuItemHandle,
 };
 
-use crate::config::{Config, ConfigManager};
+use crate::setting::{Setting, SettingWriter};
 
 pub const OPEN_CUSTOM_MENU_ITEM_ID: &str = "open";
 pub const IS_RUNNING_CUSTOM_MENU_ITEM_ID: &str = "is_running";
 pub const QUIT_CUSTOM_MENU_ITEM_ID: &str = "quit";
 
 pub trait SystemTrayUpdater: Debug + Send + Sync + 'static {
-    fn update(&self, config: &Config) -> anyhow::Result<()>;
+    fn update(&self, setting: &Setting) -> anyhow::Result<()>;
 }
 
 #[derive(Debug)]
@@ -30,9 +35,9 @@ impl SystemTrayUpdaterImpl {
 }
 
 impl SystemTrayUpdater for SystemTrayUpdaterImpl {
-    fn update(&self, config: &Config) -> anyhow::Result<()> {
+    fn update(&self, setting: &Setting) -> anyhow::Result<()> {
         self.system_tray_menu_item_handle
-            .set_selected(config.is_running)?;
+            .set_selected(setting.is_running)?;
         Ok(())
     }
 }
@@ -45,13 +50,15 @@ pub fn system_tray() -> SystemTray {
                 IS_RUNNING_CUSTOM_MENU_ITEM_ID,
                 "Active",
             ))
+            .add_native_item(Separator)
             .add_item(CustomMenuItem::new(QUIT_CUSTOM_MENU_ITEM_ID, "Quit")),
     )
 }
 
 pub fn system_tray_event(app_handle: &AppHandle, event: SystemTrayEvent) {
-    let main_window_label = &app_handle.config().tauri.windows[0].label;
-    let main_window = app_handle.get_window(main_window_label).unwrap();
+    let main_window = app_handle
+        .get_window(&app_handle.config().tauri.windows[0].label)
+        .unwrap();
     let main_window = &main_window;
     let open_window = move || {
         main_window
@@ -63,15 +70,28 @@ pub fn system_tray_event(app_handle: &AppHandle, event: SystemTrayEvent) {
             .expect("Failed to set the focus to the window");
     };
     let close_window = move || main_window.close().expect("Failed to close the window");
-    let config_manager = app_handle.state::<Arc<dyn ConfigManager>>();
+    let setting = app_handle.state::<Arc<RwLock<Setting>>>();
     match event {
         LeftClick { .. } | DoubleClick { .. } => open_window(),
         MenuItemClick { id, .. } => match id.as_str() {
             OPEN_CUSTOM_MENU_ITEM_ID => open_window(),
             IS_RUNNING_CUSTOM_MENU_ITEM_ID => {
-                config_manager
-                    .toggle_is_running()
-                    .expect("Failed to set is_running");
+                let mut s = setting.write().expect("Failed to write setting");
+                s.is_running = !s.is_running;
+
+                let setting_writer = app_handle.state::<Arc<dyn SettingWriter>>();
+                setting_writer
+                    .write_to_file(&s)
+                    .expect("Failed to write setting");
+
+                let system_tray_updater = app_handle.state::<Arc<dyn SystemTrayUpdater>>();
+                system_tray_updater
+                    .update(&s)
+                    .expect("Failed to update system tray");
+
+                app_handle
+                    .emit_all("reload_setting", ())
+                    .expect("Failed to emit event");
             }
             QUIT_CUSTOM_MENU_ITEM_ID => {
                 close_window();

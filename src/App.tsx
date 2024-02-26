@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/tauri";
+import { listen } from "@tauri-apps/api/event";
 import Box from "@mui/joy/Box";
 import Divider from "@mui/joy/Divider";
 import FormControl from "@mui/joy/FormControl";
@@ -37,12 +38,12 @@ function App() {
   const [deactivateKey, setDeactivateKey] = useState<Key>("left_alt");
 
   const fetchSettings = async () => {
-    type Config = {
+    type Setting = {
       isRunning: boolean;
       activateKey: Key;
       deactivateKey: Key;
     };
-    const settings = await invoke<Config>("get_config");
+    const settings = await invoke<Setting>("get_setting");
 
     console.log(settings);
 
@@ -53,6 +54,12 @@ function App() {
 
   useEffect(() => {
     fetchSettings();
+
+    const unlistenFuncPromise = listen("reload_setting", fetchSettings);
+
+    return () => {
+      unlistenFuncPromise.then((unlistenFunc) => unlistenFunc());
+    };
   });
 
   return (
@@ -69,7 +76,7 @@ function App() {
           <div>
             <FormLabel>Key Monitoring</FormLabel>
             <FormHelperText sx={{ mt: 1 }}>
-              Enable key monitoring and switche IME.
+              Activate key monitoring and switche IME.
             </FormHelperText>
           </div>
           <Switch
@@ -79,7 +86,7 @@ function App() {
               await fetchSettings();
             }}
             endDecorator={
-              <Box sx={{ ml: 1 }}>{isRunning ? "Enabled" : "Disabled"}</Box>
+              <Box sx={{ ml: 1 }}>{isRunning ? "Running" : "Stopped"}</Box>
             }
             sx={{ width: 120 }}
           />
@@ -135,7 +142,7 @@ function App() {
         >
           <div>
             <FormLabel>
-              <Typography level="title-md">Disable IME</Typography>
+              <Typography level="title-md">Deactivate IME</Typography>
             </FormLabel>
             <FormHelperText sx={{ mt: 1 }}>
               Select the key to disable IME.
