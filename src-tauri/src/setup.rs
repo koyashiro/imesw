@@ -11,14 +11,15 @@ use crate::{
 };
 
 pub fn setup(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
-    let setting = Arc::new(RwLock::new({
-        let setting_reader = SettingReaderImpl;
-        setting_reader.read_from_file().unwrap_or_default()
-    }));
+    let setting_reader = SettingReaderImpl;
+    let setting = setting_reader.read_from_file().unwrap_or_default();
 
     let system_tray_updater: Arc<dyn SystemTrayUpdater> = Arc::new(SystemTrayUpdaterImpl::new({
         app.tray_handle().get_item(IS_RUNNING_CUSTOM_MENU_ITEM_ID)
     }));
+    system_tray_updater.update(&setting)?;
+
+    let setting = Arc::new(RwLock::new(setting));
 
     let setting_writer: Arc<dyn SettingWriter> = Arc::new(SettingReaderImpl);
 
