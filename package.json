@@ -31,7 +31,7 @@
     "eslint-plugin-react": "7.34.0",
     "prettier": "3.2.5",
     "typescript": "5.4.2",
-    "vite": "5.1.5"
+    "vite": "5.1.6"
   },
   "volta": {
     "node": "20.11.1"
