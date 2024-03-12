@@ -11,7 +11,7 @@ edition = "2021"
 tauri-build = { version = "1.5.1", features = [] }
 
 [dependencies]
-anyhow = "1.0.80"
+anyhow = "1.0.81"
 dirs-next = "2.0.0"
 once_cell = "1.19.0"
 serde = { version = "1.0.197", features = ["derive"] }
