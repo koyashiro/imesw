@@ -36,7 +36,7 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
       - name: Build and upload artifacts
-        uses: tauri-apps/tauri-action@909e72467e893e71c967c86568f6a8ca214130d8 # v0.5.3
+        uses: tauri-apps/tauri-action@a32a76cf0a532b3e3b8d0cfb6039e2d574aace68 # v0.5.4
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
