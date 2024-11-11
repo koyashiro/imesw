@@ -34,7 +34,7 @@
     "globals": "15.12.0",
     "prettier": "3.3.3",
     "typescript": "5.6.3",
-    "vite": "5.4.10"
+    "vite": "5.4.11"
   },
   "volta": {
     "node": "20.18.0"
